@@ -15,7 +15,7 @@ library(vip)
 
 ```{r}
 
-dat <- readRDS("../data/sim_full.rds") %>% filter(trial_type == "midi_to_midi") %>% select(-trial_type)
+dat <- readRDS("../data/sim_full_15.rds") %>% filter(trial_type == "midi_to_midi") %>% select(-trial_type)
 
 ```
 

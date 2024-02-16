@@ -1,8 +1,9 @@
 library(tidyverse)
 library(melsim)
+source("R/utils.R")
+source("R/sim_analysis.R")
 
-
-setup_workspace <-function(min_ratings = 10){
+setup_workspace <-function(min_ratings = 10, recalc_sim = F){
   logging::loginfo("Reading melody objects...")
   mel_list <- readRDS("data/mel_objects.rds") %>%
     update_melodies()
@@ -42,15 +43,19 @@ setup_workspace <-function(min_ratings = 10){
   assign("rating_sim_mat", rating_sim_mat, globalenv())
 
   logging::loginfo("Calculating reduced similarity matrices...")
-  rating_sim_mat_red <- sim_ratings_avg %>%
-    filter(n >= min_ratings) %>%
-    mutate(melody1 = sprintf("MEL%04d", target_id),
-           melody2 = sprintf("MEL%04d", query_id),
-           algorithm = "ratings", full_name = "ratings") %>%
-    select(-c(target_id, query_id))
+  rating_sim_mat_m2m <- get_ratings_sim_mat(sim_ratings_avg %>%
+                                              filter(trial_type == "midi_to_midi"),
+                                            min_ratings = min_ratings)
+  rating_sim_mat_m2a <- get_ratings_sim_mat(sim_ratings_avg %>%
+                                              filter(trial_type == "midi_to_audio"),
+                                            min_ratings = min_ratings)
 
-  rating_sim_mat_red <- sim_mat_factory$new(rating_sim_mat_red, paired = T)
-  assign("rating_sim_mat_red", rating_sim_mat_red, globalenv())
 
+  assign("rating_sim_mat_m2m", rating_sim_mat_m2m, globalenv())
+  assign("rating_sim_mat_m2a", rating_sim_mat_m2a, globalenv())
+  assign("setup_min_ratings", min_ratings, globalenv())
+  if(recalc_sim){
+    recalc_similarities(min_ratings)
+  }
 
 }
