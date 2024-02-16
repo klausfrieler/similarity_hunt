@@ -4,7 +4,9 @@ get_all_similarities <- function(sim_measures, sim_ratings, mel_list){
 }
 
 recalc_similarities <- function(min_ratings = setup_min_ratings,
-                                sim_measures = c("diffed", "rawed",  "ncdintioi", "ngrtvers", "opti3")){
+                                sim_measures = c("diffed", "rawed",  "ncdintioi", "ngrtvers", "opti3",
+                                                 "ngrukko2", "ngram_ioi_class_dist2",
+                                                 "ngrukko1", "ngram_ioi_class_dist1")){
   rating_sim_mat_m2m <- get_ratings_sim_mat(sim_ratings_avg %>%
                                               filter(trial_type == "midi_to_midi"),
                                             min_ratings = min_ratings)
