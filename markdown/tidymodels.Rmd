@@ -15,7 +15,7 @@ library(vip)
 
 ```{r}
 
-dat <- readRDS("../data/sim_full.rds")
+dat <- readRDS("../data/sim_full.rds") %>% filter(trial_type == "midi_to_midi") %>% select(-trial_type)
 
 ```
 
@@ -41,13 +41,11 @@ test_data <- testing(data_split)
 
 
 rec <- train_data %>% 
-  # dplyr::mutate(dplyr::across(c(Payment, CPI, CompletionPercentage, SurveyMobileConversion, 
-  #                               TotalRemaining, MemberSinceDays, Age, Conversion), log_sort)) %>% 
   recipe(sim_ratings ~ ., data = .) %>%
   step_zv(all_numeric(), -all_outcomes()) %>%
-  #step_corr(all_predictors(), threshold = 0.7, method = "spearman")  %>%
+  step_corr(all_predictors(), threshold = 0.8, method = "pearson")  %>%
   prep()
-
+print(rec)
 ```
 
 
@@ -112,6 +110,14 @@ knitr::kable(head(xgboost_grid))
 
 ```
 
+```{r}
+lm_model <- parsnip::linear_reg()
+lm_wf <- workflows::workflow() %>% 
+  add_model(lm_model) %>% 
+  add_formula(sim_ratings ~ .)
+  
+```
+
 
 ```{r}
 
@@ -124,7 +130,7 @@ xgboost_wf <-
 ```
 
 
-```{r}
+```{r message=FALSE, warning=FALSE}
 
 metrics <- yardstick::metric_set(rmse, rsq, mae)
 
@@ -137,6 +143,7 @@ xgboost_tuned <- tune::tune_grid(
   control = tune::control_grid(verbose = TRUE)
 )
 
+
 ```
 
 
@@ -144,15 +151,25 @@ xgboost_tuned <- tune::tune_grid(
 
 train_processed <- bake(rec,  new_data = training(data_split))
 
-train_fit <- xgboost_model %>%
+xgboost_train_fit <- xgboost_model %>%
   # fit the model on all the training data
   fit(
     formula = sim_ratings ~ ., 
     data    = train_processed
   ) 
 
-train_prediction <- train_fit %>%
-  # predict the sale prices for the training data
+xgboost_train_prediction <- xgboost_train_fit %>%
+  predict(new_data = train_processed) %>%
+  bind_cols(training(data_split))
+
+lm_train_fit <- lm_model %>%
+  # fit the model on all the training data
+  fit(
+    formula = sim_ratings ~ ., 
+    data    = train_processed
+  ) 
+
+lm_train_prediction <- lm_train_fit %>%
   predict(new_data = train_processed) %>%
   bind_cols(training(data_split))
 
@@ -162,7 +179,7 @@ train_prediction <- train_fit %>%
 ```{r}
 
 xgboost_score_train <- 
-  train_prediction %>%
+  xgboost_train_prediction %>%
   yardstick::metrics(sim_ratings, .pred) %>%
   mutate(.estimate = format(round(.estimate, 2), big.mark = ","))
 
@@ -172,18 +189,35 @@ knitr::kable(xgboost_score_train)
 
 ```{r}
 
-test_fit <- tune::last_fit(object=xgboost_wf, 
-                           split= data_split, 
+xgboost_test_fit <- tune::last_fit(object = xgboost_wf, 
+                           split = data_split, 
                            metrics = metrics) 
-knitr::kable(test_fit$.metrics[[1]])
+knitr::kable(xgboost_test_fit$.metrics[[1]])
+
+```
+
+```{r}
+
+lm_test_fit <- tune::last_fit(object = lm_wf, 
+                           split = data_split, 
+                           metrics = metrics) 
+knitr::kable(lm_test_fit$.metrics[[1]])
 
 ```
 
 
 ```{r}
 
-train_fit %>% 
-  vip()
+xgboost_train_fit %>% 
+  vip::vip()
 
 ```
 
+
+
+```{r}
+
+lm_train_fit %>% 
+  vip::vip()
+
+```
