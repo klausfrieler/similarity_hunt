@@ -6,21 +6,28 @@ get_all_similarities <- function(sim_measures, sim_ratings, mel_list){
 recalc_similarities <- function(min_ratings = setup_min_ratings,
                                 sim_measures = c("diffed", "rawed",  "ncdintioi", "ngrtvers", "opti3",
                                                  "ngrukko2", "ngram_ioi_class_dist2",
-                                                 "ngrukko1", "ngram_ioi_class_dist1")){
+                                                 "ngrukko1", "ngram_ioi_class_dist1",
+                                                 "emd")){
+
   rating_sim_mat_m2m <- get_ratings_sim_mat(sim_ratings_avg %>%
                                               filter(trial_type == "midi_to_midi"),
                                             min_ratings = min_ratings)
+
   rating_sim_mat_m2a <- get_ratings_sim_mat(sim_ratings_avg %>%
                                               filter(trial_type == "midi_to_audio"),
                                             min_ratings = min_ratings)
+
   all_sim_m2m <- get_all_similarities(sim_measures,
-                                      sim_ratings %>% filter(n_ratings >= min_ratings,
-                                                             trial_type == "midi_to_midi"),
+                                      sim_ratings %>%
+                                        filter(n_ratings >= min_ratings,
+                                               trial_type == "midi_to_midi"),
                                       mel_list)
   all_sim_m2a <- get_all_similarities(sim_measures,
-                                      sim_ratings %>% filter(n_ratings >= min_ratings,
-                                                             trial_type == "midi_to_audio"),
+                                      sim_ratings %>%
+                                        filter(n_ratings >= min_ratings,
+                                               trial_type == "midi_to_audio"),
                                       mel_list)
+
   all_sim_m2m$fuse(rating_sim_mat_m2m)$remove_algorithm("const")
   all_sim_m2a$fuse(rating_sim_mat_m2a)$remove_algorithm("const")
   saveRDS(all_sim_m2m, "data/all_sim_m2m.rds")
