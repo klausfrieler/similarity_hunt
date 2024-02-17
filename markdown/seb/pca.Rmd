@@ -60,6 +60,32 @@ print(pca_mod1)
 
 ```{r}
 
+train_data <- train_data %>% 
+  cbind(predict(pca_mod1, data = train_data %>% 
+  select(sim_diffed:sim_rhytfuzz) %>% 
+  select(-sim_opti3)
+  ))
+
+```
+
+
+```{r}
+
+lm_pca_reg <- lm(sim_ratings ~ RC1 + RC2, data = train_data)
+
+
+```
+
+
+```{r}
+
+summary(lm_pca_reg)
+
+```
+
+
+```{r}
+
 test_data <- test_data %>% 
   cbind(predict(pca_mod1, 
                      
@@ -72,14 +98,18 @@ test_data <- test_data %>%
                        select(-sim_opti3)
                      
                      ) %>% tibble::as_tibble()
-  )
+  ) %>% 
+  mutate(pred = predict(lm_pca_reg, newdata = .))
+
 
 ```
 
 
+
+
 ```{r}
 
-pca_reg <- lm(sim_ratings ~ RC1 + RC2, data = test_data)
+pca_reg <- lm(sim_ratings ~ pred, data = test_data)
 
 ```
 
