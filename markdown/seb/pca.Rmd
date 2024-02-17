@@ -1,0 +1,92 @@
+
+
+
+```{r}
+
+library(psych)
+
+```
+
+```{r}
+
+dat_pca <- readRDS('../../data/all_sim_m2m.rds')
+# There is also m2a
+  
+dat_pca <- dat_pca$as_wide()
+
+```
+
+
+```{r}
+
+# Fix the random numbers by setting the seed 
+# This enables the analysis to be reproducible 
+set.seed(123)
+
+# Put 3/4 of the data into the training set 
+data_split <- initial_split(dat_pca, prop = 3/4)
+
+# Create dataframes for the two sets:
+train_data <- training(data_split) 
+test_data <- testing(data_split)
+
+```
+
+
+```{r}
+
+train_data %>% 
+  select(sim_diffed:sim_rhytfuzz) %>% 
+  select(-sim_opti3) %>% 
+  fa.parallel()
+
+```
+
+```{r}
+
+pca_mod1 <- train_data %>% 
+  select(sim_diffed:sim_rhytfuzz) %>% 
+  select(-sim_opti3) %>% 
+  principal(nfactors = 2)
+
+```
+
+
+```{r}
+
+print(pca_mod1)
+
+```
+
+```{r}
+
+test_data <- test_data %>% 
+  cbind(predict(pca_mod1, 
+                     
+                     old.data = train_data %>%
+                       select(sim_diffed:sim_rhytfuzz) %>%
+                       select(-sim_opti3),
+
+                     data = test_data %>% 
+                       select(sim_diffed:sim_rhytfuzz) %>% 
+                       select(-sim_opti3)
+                     
+                     ) %>% tibble::as_tibble()
+  )
+
+```
+
+
+```{r}
+
+pca_reg <- lm(sim_ratings ~ RC1 + RC2, data = test_data)
+
+```
+
+```{r}
+
+summary(pca_reg)
+
+```
+
+
