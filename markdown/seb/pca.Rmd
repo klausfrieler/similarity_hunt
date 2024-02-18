@@ -120,3 +120,57 @@ summary(pca_reg)
 ```
 
 
+```{r}
+
+test_data_pca <- test_data
+
+```
+
+
+```{r}
+
+load(file = 'output/lm_and_bb_test_data.rda')
+
+
+```
+
+
+```{r}
+
+test_data_pca <- cbind(test_data_pca,
+                       test_data %>% select(pred, bb_pred) %>% rename(pred2 = pred) )
+
+```
+
+
+```{r}
+
+test_data_pca <- test_data_pca %>% 
+  rowwise() %>% 
+  mutate(ensemblepred = mean(c_across(c(pred, pred2, bb_pred)), na.rm = TRUE)) %>% 
+  ungroup()
+
+```
+
+
+
+```{r}
+
+Metrics::rmse(test_data_pca$sim_ratings, test_data_pca$ensemblepred)
+
+
+```
+
+
+```{r}
+
+ensemble_reg <- lm(sim_ratings ~ ensemblepred, data = test_data_pca)
+
+
+summary(ensemble_reg)
+
+```
+
+
+
+

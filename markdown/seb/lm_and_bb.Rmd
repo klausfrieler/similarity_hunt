@@ -149,3 +149,41 @@ Metrics::rmse(bb_mod_dat_test$sim_ratings, bb_mod_dat_test$bb_pred)/1000
 
 ```
 
+
+```{r}
+
+test_data <- test_data %>% 
+  mutate(bb_pred = bb_mod_dat_test$bb_pred/1000) %>% 
+  rowwise() %>% 
+  mutate(ensemblepred = mean(c_across(c(pred, bb_pred)), na.rm = TRUE)) %>% 
+  ungroup()
+
+```
+
+
+
+```{r}
+
+Metrics::rmse(test_data$sim_ratings, test_data$ensemblepred)
+
+
+```
+
+
+```{r}
+
+lm_reg4 <- lm(sim_ratings ~ ensemblepred, data = test_data)
+
+
+summary(lm_reg4)
+
+```
+
+
+```{r}
+
+save(test_data, file = 'output/lm_and_bb_test_data.rda')
+
+```
+
+
