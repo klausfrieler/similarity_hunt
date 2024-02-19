@@ -10,7 +10,7 @@ pair_index <- function(s1, s2, sep = "_"){
 
 get_ratings_sim_mat <- function(avg_sim_ratings, min_ratings = 10){
   rating_sim_mat_red <- avg_sim_ratings %>%
-    filter(n >= min_ratings) %>%
+    filter(n_ratings >= min_ratings) %>%
     mutate(melody1 = sprintf("MEL%04d", target_id),
            melody2 = sprintf("MEL%04d", query_id),
            algorithm = "ratings", full_name = "ratings") %>%

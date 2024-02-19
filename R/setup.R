@@ -19,15 +19,15 @@ setup_workspace <-function(min_ratings = 10, recalc_sim = F){
     filter(sample_type != "catch_trial") %>%
     mutate(pair_id = pair_index(target_id, query_id))
 
-  assign("sim_ratings", sim_ratings,globalenv())
+  assign("sim_ratings", sim_ratings, globalenv())
 
   logging::loginfo("Calculating averages")
   sim_ratings_avg <- sim_ratings %>%
     group_by(target_id, query_id, pair_id, trial_type, sample_type) %>%
     summarise(sim = mean(similarity_rating, na.rm = T)/10,
-              n = n(),
+              n_ratings = n(),
               sd = sd(similarity_rating/10, na.rm = T),
-              se = sd/sqrt(n),
+              se = sd/sqrt(n_ratings),
               .groups = "drop")
   assign("sim_ratings_avg", sim_ratings_avg, globalenv())
 

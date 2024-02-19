@@ -15,8 +15,18 @@ library(vip)
 
 ```{r}
 
-dat <- readRDS("../data/sim_full_12.rds") %>% filter(trial_type == "midi_to_midi") %>% select(-trial_type)
+dat <- readRDS("../data/sim_full_5.rds") 
+dat <- dat %>% filter(trial_type == "midi_to_midi") %>% select(-trial_type, -sim_opti3)
 
+# pc2 <- dat %>% 
+#   select(starts_with("sim_")) %>% 
+#   select(-contains(c("opti", "ratings"))) %>% 
+#   psych::principal(2, rotate = "varimax")
+
+# dat <- pc2$scores %>% 
+#   as_tibble() %>% 
+#   set_names(c("sim_pc_pitch", "sim_pc_rhythm")) %>% 
+#   bind_cols(dat %>% select(sim_ratings, trial_type))
 ```
 
 
@@ -43,7 +53,8 @@ test_data <- testing(data_split)
 rec <- train_data %>% 
   recipe(sim_ratings ~ ., data = .) %>%
   step_zv(all_numeric(), -all_outcomes()) %>%
-  step_corr(all_predictors(), threshold = 0.8, method = "pearson")  %>%
+  #step_pca(all_numeric_predictors(), num_comp = 2) %>% 
+  #step_corr(all_numeric_predictors(), threshold = 0.8, method = "pearson")  %>%
   prep()
 print(rec)
 ```
@@ -106,7 +117,7 @@ xgboost_grid <-
     size = 60
   )
 
-knitr::kable(head(xgboost_grid))
+#knitr::kable(head(xgboost_grid))
 
 ```
 
@@ -150,6 +161,7 @@ xgboost_tuned <- tune::tune_grid(
 ```{r}
 
 train_processed <- bake(rec,  new_data = training(data_split))
+test_processed <- bake(rec,  new_data = testing(data_split))
 
 xgboost_train_fit <- xgboost_model %>%
   # fit the model on all the training data
@@ -169,9 +181,19 @@ lm_train_fit <- lm_model %>%
     data    = train_processed
   ) 
 
+lm_test_fit <- lm_model %>%
+  # fit the model on all the training data
+  fit(
+    formula = sim_ratings ~ ., 
+    data    = test_processed
+  ) 
 lm_train_prediction <- lm_train_fit %>%
   predict(new_data = train_processed) %>%
   bind_cols(training(data_split))
+
+lm_test_prediction <- lm_test_fit %>%
+  predict(new_data = test_processed) %>%
+  bind_cols(testing(data_split))
 
 ```
 
@@ -189,19 +211,31 @@ knitr::kable(xgboost_score_train)
 
 ```{r}
 
-xgboost_test_fit <- tune::last_fit(object = xgboost_wf, 
-                           split = data_split, 
-                           metrics = metrics) 
-knitr::kable(xgboost_test_fit$.metrics[[1]])
+lm_score_train <- 
+  lm_train_prediction %>%
+  yardstick::metrics(sim_ratings, .pred) %>%
+  mutate(.estimate = format(round(.estimate, 2), big.mark = ","))
+
+knitr::kable(lm_score_train)
 
 ```
 
 ```{r}
 
-lm_test_fit <- tune::last_fit(object = lm_wf, 
+xgboost_test_fit <- tune::last_fit(object = xgboost_wf, 
                            split = data_split, 
                            metrics = metrics) 
-knitr::kable(lm_test_fit$.metrics[[1]])
+knitr::kable(xgboost_test_fit$.metrics[[1]], digits = 2)
+
+```
+
+```{r}
+
+lm_test_fit <- lm_test_prediction %>% 
+  yardstick::metrics(sim_ratings, .pred) %>% 
+   mutate(.estimate = format(round(.estimate, 2), big.mark = ","))
+
+knitr::kable(lm_test_fit)
 
 ```
 
