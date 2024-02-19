@@ -15,7 +15,9 @@ library(vip)
 
 ```{r}
 
-dat <- readRDS("../data/sim_full_12.rds") %>% filter(trial_type == "midi_to_midi") %>% select(-trial_type)
+dat <- readRDS("../data/sim_full_15.rds") %>% 
+  filter(trial_type == "midi_to_midi") %>% 
+  select(-c(trial_type, sim_opti3))
 
 ```
 
@@ -45,7 +47,9 @@ rec <- train_data %>%
   step_zv(all_numeric(), -all_outcomes()) %>%
   step_corr(all_predictors(), threshold = 0.8, method = "pearson")  %>%
   prep()
+
 print(rec)
+
 ```
 
 
@@ -111,7 +115,9 @@ knitr::kable(head(xgboost_grid))
 ```
 
 ```{r}
+
 lm_model <- parsnip::linear_reg()
+
 lm_wf <- workflows::workflow() %>% 
   add_model(lm_model) %>% 
   add_formula(sim_ratings ~ .)
@@ -201,6 +207,7 @@ knitr::kable(xgboost_test_fit$.metrics[[1]])
 lm_test_fit <- tune::last_fit(object = lm_wf, 
                            split = data_split, 
                            metrics = metrics) 
+
 knitr::kable(lm_test_fit$.metrics[[1]])
 
 ```

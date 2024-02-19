@@ -17,3 +17,4 @@ get_ratings_sim_mat <- function(avg_sim_ratings, min_ratings = 10){
     select(-c(target_id, query_id))
   sim_mat_factory$new(rating_sim_mat_red, paired = T)
 }
+

@@ -12,6 +12,76 @@ use_condaenv('r-reticulate')
 ```
 
 
+
+```{r}
+
+
+get_fine_tuned_completion <- function(prompt) {
+
+  model <- "ft:davinci-002:personal::8tFCG3SU"
+
+  # Set up the API endpoint
+  endpoint <- "https://api.openai.com/v1/completions"
+
+  # Prepare the request body
+  data <- list(
+    prompt = prompt,
+    model = model,
+    max_tokens = 1L,
+    temperature = 0
+  )
+
+  # Make the API request
+  response <- httr::POST(
+    url = endpoint,
+    httr::add_headers("Content-Type" = "application/json", "Authorization" = paste("Bearer", Sys.getenv("OPENAI_API_KEY"))),
+    body = data,
+    encode = "json"
+  )
+
+  # Check for a successful response
+  if (httr::http_status(response)$category == "Success") {
+    
+    result <- httr::content(response, "parsed")
+
+    prediction <- result$choices[[1]]$text
+    
+    return(prediction)
+
+  } else {
+    logging::logerror("API request failed. Status code: ", httr::http_status(response)$status_code)
+  }
+
+}
+
+
+```
+
+
+
+```{r}
+
+get_chatgpt_word_embedding <- function(input) {
+
+
+  data <- httr::POST(url = "https://api.openai.com/v1/embeddings", 
+                    httr::add_headers(
+                      Authorization = paste0("Bearer ", Sys.getenv("OPENAI_API_KEY"))
+                      ),
+                      httr::content_type_json(),
+                    encode = "json",
+                    body = list(
+                      input = input,
+                      model = "text-embedding-3-large"
+                    ))
+  
+  rjson::fromJSON(httr::content(data, type="text"))$data[[1]]$embedding
+
+}
+
+```
+
+
 ```{r}
 
 dat <- readRDS('../../data/soundout_data.rds') %>% 
@@ -60,52 +130,6 @@ val_data$to_json("similarity_val.jsonl", orient = 'records', lines= TRUE)
 (Upload through online GUI)
 
 
-
-```{r}
-
-
-get_fine_tuned_completion <- function(prompt) {
-
-  model <- "ft:davinci-002:personal::8tFCG3SU"
-
-  # Set up the API endpoint
-  endpoint <- "https://api.openai.com/v1/completions"
-
-  # Prepare the request body
-  data <- list(
-    prompt = prompt,
-    model = model,
-    max_tokens = 1L,
-    temperature = 0
-  )
-
-  # Make the API request
-  response <- httr::POST(
-    url = endpoint,
-    httr::add_headers("Content-Type" = "application/json", "Authorization" = paste("Bearer", Sys.getenv("OPENAI_API_KEY"))),
-    body = data,
-    encode = "json"
-  )
-
-  # Check for a successful response
-  if (httr::http_status(response)$category == "Success") {
-    
-    result <- httr::content(response, "parsed")
-
-    prediction <- result$choices[[1]]$text
-    
-    return(prediction)
-
-  } else {
-    logging::logerror("API request failed. Status code: ", httr::http_status(response)$status_code)
-  }
-
-}
-
-
-```
-
-
 ```{r}
 
 val_data <- 
@@ -144,28 +168,6 @@ It's not that great, anyway.
 
 Word embedding approach
 
-
-```{r}
-
-get_chatgpt_word_embedding <- function(input) {
-
-
-  data <- httr::POST(url = "https://api.openai.com/v1/embeddings", 
-                    httr::add_headers(
-                      Authorization = paste0("Bearer ", Sys.getenv("OPENAI_API_KEY"))
-                      ),
-                      httr::content_type_json(),
-                    encode = "json",
-                    body = list(
-                      input = input,
-                      model = "text-embedding-3-large"
-                    ))
-  
-  rjson::fromJSON(httr::content(data, type="text"))$data[[1]]$embedding
-
-}
-
-```
 
 ```{r}
 
@@ -219,6 +221,91 @@ summary(chatgpt_word_embedding_lm)
 
 Also not that impressive.
 
+
+
+Do the same but only with the smaller, more reliable melody sets:
+
+
+
+
+
+
+And again with the embeddings approach
+
+
+```{r}
+
+dat_we2 <- readRDS('../../data/all_sim_m2m.rds')
+# There is also m2a
+  
+dat_we2 <- dat_we2$as_wide()
+
+dat_we2 <- dat_we2 %>% 
+  select(melody1, melody2, sim_ratings) %>%
+  mutate(rating_pair = row_number() ) %>% 
+  pivot_longer(melody1:melody2, values_to = "melody_no") %>% 
+  mutate(melody_no = readr::parse_number(melody_no))
+  
+
+
+mels <- readRDS('../../data/mel_list.rds')
+
+
+
+dat_we2 <- dat_we2 %>% 
+  left_join(mels, by = c("melody_no" = "mel_id"))
+
+
+```
+
+```{r}
+
+dat_we2 <- dat_we2 %>% 
+  rowwise() %>% 
+  mutate(melody = glue::glue("notes: { {pitch} }, durations: {duration}"),
+         melody = paste0("{ ", melody, " }")) %>% 
+  ungroup() %>% 
+  rowwise() %>% 
+  mutate(embedding = list( get_chatgpt_word_embedding(melody) )) %>% 
+  ungroup()
+
+```
+
+
+```{r}
+
+dat_we2 <- dat_we2 %>% 
+  mutate(melody_no = readr::parse_number(name)) %>% 
+  select(rating_pair, melody_no, embedding, sim_ratings) %>% 
+  pivot_wider(everything(), names_from = "melody_no", values_from = "embedding") %>% 
+  rename(melody_1 = `1`,
+         melody_2 = `2`) %>%  
+  rowwise() %>% 
+  mutate(cosine_sim = lsa::cosine( unlist(melody_1), unlist(melody_2) )) %>% 
+  ungroup()
+
+# All very high cosine sims...
+
+save(dat_we2, file = 'output/dat_we2.rda')
+
+```
+
+There isn't really a sense in there being a test set here because the model is already built.
+
+
+```{r}
+
+chatgpt_word_embedding_lm2 <- lm(sim_ratings ~ cosine_sim, data = dat_we2)
+
+
+```
+
+
+```{r}
+
+summary(chatgpt_word_embedding_lm2)
+
+```
 
 
 

@@ -1,0 +1,201 @@
+
+
+
+```{r}
+
+library(tidyverse)
+library(psych)
+library(tidymodels)
+
+
+```
+
+
+```{r}
+
+dat_feat <- readRDS('../../data/all_sim_m2m.rds')
+# There is also m2a
+  
+dat_feat <- dat_feat$as_wide()
+
+dat_feat <- dat_feat %>% 
+  select(melody1, melody2, sim_ratings) %>%
+  mutate(rating_pair = row_number() ) %>% 
+  pivot_longer(melody1:melody2, values_to = "melody_no") %>% 
+  mutate(melody_no = readr::parse_number(melody_no))
+  
+
+
+mels <- readRDS('../../data/mel_list.rds')
+
+
+
+dat_feat <- dat_feat %>% 
+  left_join(mels, by = c("melody_no" = "mel_id")) %>% 
+  rename(abs_melody = pitch,
+         durations = duration) %>% 
+  itembankr::get_melody_features() %>% 
+  rowwise() %>%
+  mutate(total_duration = sum(itembankr::str_mel_to_vector(durations))) %>% 
+  ungroup() %>%
+  dplyr::mutate(total_information_content = N * mean_information_content,
+                mean_idf = mean(somem::so_assets_features$mean_idf) )
+
+
+dat_feat <- dat_feat %>% 
+  cbind(
+
+  predict(somem::pca_melodic_features2, 
+                       
+         old.data = somem::so_assets_features %>% 
+           dplyr::select(N, tonalness, tonal.clarity, tonal.spike, step.cont.glob.var,
+                  step.cont.loc.var, i.entropy, d.entropy, d.eq.trans,
+                  mean_int_size, int_range,
+                  span, total_duration ,
+                  total_information_content,
+                  mean_idf
+                  ),
+  
+         data = dat_feat %>% 
+           dplyr::select(N, tonalness, tonal.clarity, tonal.spike, step.cont.glob.var,
+                  step.cont.loc.var, i.entropy, d.entropy, d.eq.trans,
+                  mean_int_size, int_range,
+                  span, total_duration ,
+                  total_information_content,
+                  mean_idf
+                  )
+         
+         ) %>% tibble::as_tibble()
+
+  ) %>%
+  rename(`Intervallic Complexity` = RC1,
+         `Breadth of Material` = RC2,
+         `Tonality` = RC3,
+         `Durational Complexity` = RC4) %>% 
+  select(sim_ratings, 
+         rating_pair, 
+         melody_no,
+         name, 
+         `Intervallic Complexity`, `Breadth of Material`, `Tonality`, `Durational Complexity`) #%>% 
+  # pivot_wider(id_cols = c(rating_pair,
+  #                         `Intervallic Complexity`, `Breadth of Material`, `Tonality`, `Durational Complexity`), names_from = name, values_from = melody_no)
+
+
+```
+
+
+```{r}
+
+feat_dat <- dat_feat %>% 
+  filter(name == "melody1") %>% 
+  select(-c(name, melody_no))
+
+feat_dat2 <- dat_feat %>% 
+  filter(name == "melody2") %>% 
+  select(-c(name, melody_no, sim_ratings)) %>% 
+  rename(`Intervallic Complexity_2` = `Intervallic Complexity`, 
+         `Breadth of Material_2` = `Breadth of Material`, 
+         `Tonality_2` = Tonality, 
+         `Durational Complexity_2` = `Durational Complexity`)
+
+
+feat_dat <- feat_dat %>% 
+  left_join(feat_dat2, by = "rating_pair")
+
+```
+
+
+```{r}
+
+feat_dat <- feat_dat %>% 
+  rowwise() %>% 
+  mutate(AvgIntervallicComplexity = mean(c_across(c(`Intervallic Complexity`, `Intervallic Complexity_2`))), 
+         AvgBreadthofMaterial = mean(c_across(c(`Breadth of Material`, `Breadth of Material_2`))), 
+         AvgTonality = mean(c_across(c(Tonality, Tonality_2))), 
+         AvgDurationalComplexity = mean(c_across(c(`Durational Complexity`, `Durational Complexity_2`)))) %>% 
+  ungroup()
+
+
+```
+
+
+
+
+```{r}
+
+# Fix the random numbers by setting the seed 
+# This enables the analysis to be reproducible 
+set.seed(123)
+
+# Put 3/4 of the data into the training set 
+data_split <- initial_split(feat_dat, prop = 3/4)
+
+# Create dataframes for the two sets:
+train_data <- training(data_split) 
+test_data <- testing(data_split)
+
+```
+
+
+```{r}
+
+
+feat_mod <- lm(sim_ratings ~ AvgIntervallicComplexity + AvgBreadthofMaterial + AvgTonality + AvgDurationalComplexity,
+               data = train_data)
+
+
+```
+
+
+```{r}
+
+summary(feat_mod)
+
+```
+
+
+```{r}
+
+train_data <- train_data %>% 
+  rowwise() %>% 
+  mutate(cosine_feature_sim = as.numeric(lsa::cosine(
+                                          c(`Intervallic Complexity`, `Breadth of Material`, 
+                                            Tonality, `Durational Complexity`),
+                                          
+                                          c(`Intervallic Complexity_2`, `Breadth of Material_2`, 
+                                            Tonality_2, `Durational Complexity_2`)
+                                          
+                                          ))) %>% 
+  ungroup()
+
+```
+
+
+```{r}
+
+feat_mod2 <- lm(sim_ratings ~ cosine_feature_sim, data = train_data)
+
+```
+
+
+```{r}
+
+summary(feat_mod2)
+
+
+```
+
+```{r}
+
+
+save(train_data, file = 'output/train_data_feat_dat.rda')
+
+```
+
+```{r}
+
+
+save(test_data, file = 'output/test_data_feat_dat.rda')
+
+```
+
