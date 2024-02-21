@@ -8,15 +8,23 @@ library(tidymodels)
 library(ranger)
 library(xgboost)
 library(vip)
+source("../R/utils.R")
 
 ```
 
 
 
 ```{r}
+mel_features <- readRDS("../data/mel_features.rds")
+dat <- readRDS("../data/all_sim_10_m2m.rds") 
+dat <- add_feature_sim(dat, mel_features)
+dat <- dat$remove_algorithm("opti3")$as_wide() %>% 
+  select_numeric()  %>% 
+  select(which(nchar(names(.))  <= 12))
 
-dat <- readRDS("../data/sim_full_5.rds") 
-dat <- dat %>% filter(trial_type == "midi_to_midi") %>% select(-trial_type, -sim_opti3)
+# dat <- dat %>% 
+#   #filter(trial_type == "midi_to_audio") %>% 
+#   select( -sim_opti3)
 
 # pc2 <- dat %>% 
 #   select(starts_with("sim_")) %>% 
@@ -35,7 +43,7 @@ dat <- dat %>% filter(trial_type == "midi_to_midi") %>% select(-trial_type, -sim
 
 # Fix the random numbers by setting the seed 
 # This enables the analysis to be reproducible 
-set.seed(123)
+set.seed(124)
 
 # Put 3/4 of the data into the training set 
 data_split <- initial_split(dat, prop = 3/4)
@@ -53,7 +61,7 @@ test_data <- testing(data_split)
 rec <- train_data %>% 
   recipe(sim_ratings ~ ., data = .) %>%
   step_zv(all_numeric(), -all_outcomes()) %>%
-  #step_pca(all_numeric_predictors(), num_comp = 2) %>% 
+  #step_pca(all_numeric_predictors(), num_comp = 3) %>% 
   #step_corr(all_numeric_predictors(), threshold = 0.8, method = "pearson")  %>%
   prep()
 print(rec)
